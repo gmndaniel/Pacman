@@ -19,21 +19,13 @@ public class GameMode extends Thread {
         if (frightenedTime == 0) {
             incCycle();
         } else {
-            frightenedMode();
+            frightenedSleep();
         }
     }
 
     public int getFrightenedTime() {
         return frightenedTime;
     }
-
-    private void frightenedMode() {
-//        System.out.println("FRIGHTENED");
-        frightenedSleep(frightenedTime);
-        frightenedTime = 0;
-//        System.out.println("Frightened ended");
-    }
-
 
     public void setFrightened(int frightenedTime) {
         startedFrighted = true;
@@ -55,10 +47,13 @@ public class GameMode extends Thread {
         }
     }
 
-    private void frightenedSleep(int sleepTime) {
+    private void frightenedSleep() {
         try {
             synchronized (this) {
-                wait(sleepTime * 1000);
+                while (frightenedTime > 0) {
+                    wait((1) * 1000);
+                    --frightenedTime;
+                }
             }
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -74,10 +69,6 @@ public class GameMode extends Thread {
         return chaseMode;
     }
 
-    public void resetCycle() {
-        cycle = 0;
-    }
-
     public void incCycle() {
         ++cycle;
     }
@@ -85,5 +76,4 @@ public class GameMode extends Thread {
     public int getCycle() {
         return cycle;
     }
-
 }

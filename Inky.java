@@ -9,10 +9,10 @@ public class Inky extends Ghost {
         homeCell1 = Pacman.field[29][22];
         homeCell2 = Pacman.field[25][22];
         homeCell = homeCell1;
-        ghostHouse = Pacman.field[14][15];
+        ghostHouse = cell;
         danceStance = 6;
         loadNormalDanceStances();
-        loadSprite();
+        startAnimation(normalDanceAnimation[0]);
     }
 
     @Override

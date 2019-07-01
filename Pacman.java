@@ -1,5 +1,5 @@
 package PacmanPack;
-// Another new comments
+
 import javax.imageio.ImageIO;
 import javax.sound.sampled.*;
 import java.applet.Applet;
@@ -11,10 +11,8 @@ import java.io.IOException;
 import java.net.URL;
 
 import static PacmanPack.Pacman.Type.*;
-import static java.awt.event.KeyEvent.VK_UP;
-import static java.awt.event.KeyEvent.VK_DOWN;
-import static java.awt.event.KeyEvent.VK_LEFT;
-import static java.awt.event.KeyEvent.VK_RIGHT;
+import static PacmanPack.SpriteMap.getSprite;
+import static java.awt.event.KeyEvent.*;
 
 public class Pacman extends Applet implements Runnable, KeyListener {
 
@@ -42,6 +40,7 @@ public class Pacman extends Applet implements Runnable, KeyListener {
 
     Graphics2D gfx;
     private BufferedImage mazeImg;
+    private BufferedImage readyImg;
     private Cell blinkyPath;
     private Cell pinkyPath;
     private Cell inkyPath;
@@ -52,7 +51,13 @@ public class Pacman extends Applet implements Runnable, KeyListener {
     public final static int KEY_DOWN = 1;
     public final static int KEY_LEFT = 2;
     public final static int KEY_RIGHT = 3;
+    public final static int KEY_RESTART = 4;
     private boolean[] keysPressed;
+    private int lives;
+    private boolean pacmanIsAlive = true;
+    private boolean readySign = true;
+    private BufferedImage pacmanLife;
+    private BufferedImage gameOverImg;
 
     public enum Type {WALL, DOT, EMPTY, SUPER, L_PORTAL, R_PORTAL, GHOST_HOUSE}
 
@@ -60,10 +65,6 @@ public class Pacman extends Applet implements Runnable, KeyListener {
 
     static Cell[][] field;
     static int[][] fieldMatrix;
-    static Cell ghostHouseDoorMat = new Cell(11, 14.5);
-    static Cell ghostHouseMid = new Cell(14, 14.5);
-    static Cell ghostHouseLeft = new Cell(14, 13.5);
-    static Cell ghostHouseRight = new Cell(14, 15.5);
 
     static ThePacman pacman;
     static Ghost blinky;
@@ -71,27 +72,28 @@ public class Pacman extends Applet implements Runnable, KeyListener {
     static Ghost inky;
     static Ghost clyde;
     GameMode gameMode;
-    static boolean pacmanIsDying = false;
-    static boolean standStill = false;
+    static boolean pacmanIsDying;
+    static boolean standStill;
 
     private int framesOnSameCell = 0;
-    int score = 0;
+    int score;
     static int dots = 0;
+    static boolean muteSound = false;
 
     @Override
     public void init() {
-        setupSound();
         this.resize(PIXELS_WIDTH, PIXELS_HEIGHT);
         setBackground(Color.BLACK);
-        makeField();
-        createSprites();
+        loadReadyImg();
+        loadGameOverImg();
+        loadPacmanLifeImg();
+        setupSound();
         gameMode = new GameMode();
         keysPressed = new boolean[5];
         Thread gameThread = new Thread(this);
         gameThread.start();
         this.addKeyListener(this);
     }
-
 
     private void setupSound() {
         Mixer.Info[] mixInfos = AudioSystem.getMixerInfo();
@@ -151,25 +153,45 @@ public class Pacman extends Applet implements Runnable, KeyListener {
 
     private void createSprites() {
         pacman = new ThePacman(field[23][15], 0);
-//        blinky = new Blinky(field[11][15], 1);
-        blinky = new Blinky(ghostHouseMid, 1);
-//        pinky = new Pinky(field[14][14], 2);
-//        inky = new Inky(field[14][15], 3);
-//        clyde = new Clyde(field[14][16], 4);
+        blinky = new Blinky(field[11][15], 1);
+        pinky = new Pinky(field[14][15], 2);
+        inky = new Inky(field[14][13], 3);
+        clyde = new Clyde(field[14][16], 4);
     }
 
     @Override
     public void paint(Graphics g) {
         loadMazeImage();
         gfx = (Graphics2D) mazeImg.getGraphics();
-        drawPath(gfx, blinkyPath, 1);
+//        drawPath(gfx, blinkyPath, 1);
 //        drawPath(gfx, pinkyPath, 2);
 //        drawPath(gfx, inkyPath, 3);
 //        drawPath(gfx, clydePath, 4);
         drawItems(gfx);
         drawSprites(gfx);
         drawScore(gfx);
+        drawLives(gfx);
+        drawReadySign(gfx);
+        drawGameOver(gfx);
         g.drawImage(mazeImg, 0, 0, this);
+    }
+
+    private void drawGameOver(Graphics2D gfx) {
+        if (lives <= 0) {
+            gfx.drawImage(gameOverImg, 180, 300, this);
+        }
+    }
+
+    private void drawLives(Graphics2D g) {
+        for (int i = 0; i < lives; ++i) {
+            g.drawImage(pacmanLife, 10 + 30 * i, PIXELS_HEIGHT - 35, this);
+        }
+    }
+
+    private void drawReadySign(Graphics2D g) {
+        if (readySign) {
+            g.drawImage(readyImg, 190, 295, this);
+        }
     }
 
     private void drawScore(Graphics2D g) {
@@ -177,25 +199,23 @@ public class Pacman extends Applet implements Runnable, KeyListener {
         g.setFont(new Font("Helvetica", Font.BOLD, 16));
         g.drawString("SCORE", PIXELS_WIDTH / 2 - 40, PIXELS_HEIGHT - 22);
         g.drawString("" + score, PIXELS_WIDTH / 2 - 40, PIXELS_HEIGHT - 5);
-        g.drawString("dots", PIXELS_WIDTH / 2 - 40 + 80, PIXELS_HEIGHT - 22);
-        g.drawString("" + dots, PIXELS_WIDTH / 2 - 40 + 80, PIXELS_HEIGHT - 5);
 
     }
 
     private void drawSprites(Graphics2D g) {
         pacman.draw(g);
         blinky.draw(g);
-//        pinky.draw(g);
-//        inky.draw(g);
-//        clyde.draw(g);
+        pinky.draw(g);
+        inky.draw(g);
+        clyde.draw(g);
     }
 
     private void moveSprites() {
         pacman.move(gameMode.isChaseMode());
         blinkyPath = blinky.move(gameMode.isChaseMode());
-//        pinkyPath = pinky.move(gameMode.isChaseMode());
-//        inkyPath = inky.move(gameMode.isChaseMode());
-//        clydePath = clyde.move(gameMode.isChaseMode());
+        pinkyPath = pinky.move(gameMode.isChaseMode());
+        inkyPath = inky.move(gameMode.isChaseMode());
+        clydePath = clyde.move(gameMode.isChaseMode());
     }
 
     private void drawPath(Graphics2D g, Cell end, int spriteLevel) {
@@ -218,6 +238,27 @@ public class Pacman extends Applet implements Runnable, KeyListener {
         }
     }
 
+    private void loadGameOverImg() {
+        try {
+            gameOverImg = ImageIO.read(getClass().getResource("/PacmanPack/images/game_over.png"));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void loadReadyImg() {
+        try {
+            readyImg = ImageIO.read(getClass().getResource("/PacmanPack/images/ready.png"));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    private void loadPacmanLifeImg() {
+        pacmanLife = getSprite(1, 0);
+    }
+
     private void makeField() {
         int d = 1; // dot
         int e = 2; // empty
@@ -229,7 +270,6 @@ public class Pacman extends Applet implements Runnable, KeyListener {
         field = new Cell[FIELD_HEIGHT][FIELD_WIDTH];
         createCells(d, e, g, s, L, R);
         setCellsNeighbors();
-        createGhostHouse();
     }
 
     private static void createCells(int d, int e, int g, int s, int l, int r) {
@@ -262,18 +302,6 @@ public class Pacman extends Applet implements Runnable, KeyListener {
         return WALL;
     }
 
-    private void createGhostHouse() {
-        ghostHouseDoorMat = new Cell(11, 14.5);
-        ghostHouseMid = new Cell(14, 14.5);
-        ghostHouseLeft = new Cell(14, 13.5);
-        ghostHouseRight = new Cell(14, 15.5);
-//
-        ghostHouseDoorMat.setGhostHouseNeighbors();
-        ghostHouseMid.setGhostHouseNeighbors();
-        ghostHouseLeft.setGhostHouseNeighbors();
-        ghostHouseRight.setGhostHouseNeighbors();
-    }
-
     private void populateFieldMatrix(int d, int e, int g, int s, int L, int R) {
         fieldMatrix = new int[][]{
                 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -288,9 +316,9 @@ public class Pacman extends Applet implements Runnable, KeyListener {
                 {0, 0, 0, 0, 0, 0, 0, d, 0, 0, 0, 0, 0, e, 0, 0, e, 0, 0, 0, 0, 0, d, 0, 0, 0, 0, 0, 0, 0},
                 {0, 0, 0, 0, 0, 0, 0, d, 0, 0, 0, 0, 0, e, 0, 0, e, 0, 0, 0, 0, 0, d, 0, 0, 0, 0, 0, 0, 0},
                 {0, 0, 0, 0, 0, 0, 0, d, 0, 0, e, e, e, e, e, e, e, e, e, e, 0, 0, d, 0, 0, 0, 0, 0, 0, 0},
-                {0, 0, 0, 0, 0, 0, 0, d, 0, 0, e, 0, 0, 0, 0, 0, 0, 0, 0, e, 0, 0, d, 0, 0, 0, 0, 0, 0, 0},
-                {0, 0, 0, 0, 0, 0, 0, d, 0, 0, e, 0, 0, 0, 0, 0, 0, 0, 0, e, 0, 0, d, 0, 0, 0, 0, 0, 0, 0},
-                {L, e, e, e, e, e, e, d, e, e, e, 0, 0, 0, 0, 0, 0, 0, 0, e, e, e, d, e, e, e, e, e, e, R},
+                {0, 0, 0, 0, 0, 0, 0, d, 0, 0, e, 0, 0, 0, 0, g, 0, 0, 0, e, 0, 0, d, 0, 0, 0, 0, 0, 0, 0},
+                {0, 0, 0, 0, 0, 0, 0, d, 0, 0, e, 0, 0, 0, e, e, 0, 0, 0, e, 0, 0, d, 0, 0, 0, 0, 0, 0, 0},
+                {L, e, e, e, e, e, e, d, e, e, e, 0, 0, e, e, e, e, 0, 0, e, e, e, d, e, e, e, e, e, e, R},
                 {0, 0, 0, 0, 0, 0, 0, d, 0, 0, e, 0, 0, 0, 0, 0, 0, 0, 0, e, 0, 0, d, 0, 0, 0, 0, 0, 0, 0},
                 {0, 0, 0, 0, 0, 0, 0, d, 0, 0, e, 0, 0, 0, 0, 0, 0, 0, 0, e, 0, 0, d, 0, 0, 0, 0, 0, 0, 0},
                 {0, 0, 0, 0, 0, 0, 0, d, 0, 0, e, e, e, e, e, e, e, e, e, e, 0, 0, d, 0, 0, 0, 0, 0, 0, 0},
@@ -317,24 +345,75 @@ public class Pacman extends Applet implements Runnable, KeyListener {
 
     @Override
     public void run() {
+        boolean gameRunning = true;
+        while (gameRunning) {
+            stopClip(eatSuperClip);
+            stopClip(sirenClip);
+            stopClip(eatDotsClip);
+            score = 0;
+            makeField();
+            lives = 3;
+            keysPressed[KEY_RESTART] = false;
 
-//        playIntroMusic();
+            respawnAll();
 
-        while (true) {
+            startingGhostsDance(false);
+            playIntroMusic();
+            while (!keysPressed[KEY_RESTART]) {
 
-            moveSprites();
-            if (!standStill) {
-                playLoopClip(sirenClip);
-                gameModeCycle();
-                handleCollisions();
-                handleFrightenedModes();
-                eatDots();
-                eatSuper();
-                handleKeyPresses();
+                if (!pacmanIsAlive && lives > 0) {
+                    respawnAll();
+                    new Thread(this::delayedDisableStandStillShort).start();
+                }
+                if (lives > 0) {
+                    new Thread(this::delayedReleaseGhosts).start();
+                }
+                while (pacmanIsAlive && !keysPressed[KEY_RESTART]) {
+                    if (!standStill) {
+                        handleKeyPresses();
+                        moveSprites();
+                        gameModeCycle();
+                        handleCollisions();
+                        handleFrightenedModes();
+                        eatDots();
+                        eatSuper();
+                    }
+                    repaint();
+                    sleep(16);
+                }
+
+                if (lives <= 0) {
+                    standStill = true;
+                }
+
+                repaint();
+                sleep(16);
             }
-            repaint();
-            sleep(16);
         }
+    }
+
+    private void respawnAll() {
+        createSprites();
+        pacmanIsDying = false;
+        pacmanIsAlive = true;
+        startingGhostsDance(true);
+        standStill = true;
+    }
+
+    private void startingGhostsDance(boolean d) {
+        pinky.setDancingInGhostHouse(d);
+        inky.setDancingInGhostHouse(d);
+        clyde.setDancingInGhostHouse(d);
+    }
+
+    private void delayedReleaseGhosts() {
+        sleep(4100);
+        sleep(3000);
+        pinky.setDancingInGhostHouse(false);
+        sleep(4000);
+        inky.setDancingInGhostHouse(false);
+        sleep(4000);
+        clyde.setDancingInGhostHouse(false);
     }
 
     private void playIntroMusic() {
@@ -347,6 +426,14 @@ public class Pacman extends Applet implements Runnable, KeyListener {
 
     private void delayedDisableStandStill() {
         sleep(4100);
+        startingGhostsDance(true);
+        standStill = false;
+        readySign = false;
+    }
+
+    private void delayedDisableStandStillShort() {
+        sleep(1000);
+        startingGhostsDance(true);
         standStill = false;
     }
 
@@ -354,9 +441,9 @@ public class Pacman extends Applet implements Runnable, KeyListener {
         boolean collision = false;
 
         collision |= pacmanGhostCollision(blinky) & !blinky.isFrightened;
-//        collision |= pacmanGhostCollision(pinky) & !pinky.isFrightened;
-//        collision |= pacmanGhostCollision(inky) & !inky.isFrightened;
-//        collision |= pacmanGhostCollision(clyde) & !clyde.isFrightened;
+        collision |= pacmanGhostCollision(pinky) & !pinky.isFrightened;
+        collision |= pacmanGhostCollision(inky) & !inky.isFrightened;
+        collision |= pacmanGhostCollision(clyde) & !clyde.isFrightened;
 
         if (collision && !pacmanIsDying) {
             pacmanDies();
@@ -366,10 +453,16 @@ public class Pacman extends Applet implements Runnable, KeyListener {
     private void pacmanDies() {
         pacmanIsDying = true;
         stopClip(sirenClip);
-        sirenClip.close();
         stopClip(eatDotsClip);
         playClip(pacmanDeathClip);
         pacmanDeathAnimation();
+        new Thread(this::delayedRespawn).start();
+    }
+
+    private void delayedRespawn() {
+        sleep(2000);
+        --lives;
+        pacmanIsAlive = false;
     }
 
     private void pacmanDeathAnimation() {
@@ -380,7 +473,7 @@ public class Pacman extends Applet implements Runnable, KeyListener {
     private boolean pacmanGhostCollision(Ghost ghost) {
         double dRow = Math.abs(pacman.getVirtualRow() - ghost.getVirtualRow());
         double dCol = Math.abs(pacman.getVirtualCol() - ghost.getVirtualCol());
-        if (dRow <= 1.5 && dCol <= 1.5) {
+        if (dRow <= 1.2 && dCol <= 1.2) {
             return true;
         }
         return false;
@@ -415,9 +508,9 @@ public class Pacman extends Applet implements Runnable, KeyListener {
 
     private void setGhostsFrightenedStage(int s) {
         setFrightenedStageIfNotEyes(blinky, s);
-//        setFrightenedStageIfNotEyes(pinky, s);
-//        setFrightenedStageIfNotEyes(inky, s);
-//        setFrightenedStageIfNotEyes(clyde, s);
+        setFrightenedStageIfNotEyes(pinky, s);
+        setFrightenedStageIfNotEyes(inky, s);
+        setFrightenedStageIfNotEyes(clyde, s);
     }
 
     private void setFrightenedStageIfNotEyes(Ghost ghost, int s) {
@@ -427,35 +520,46 @@ public class Pacman extends Applet implements Runnable, KeyListener {
     }
 
     private void handleFrightenedModes() {
+        if (!pacmanIsDying) {
+            if (gameMode.getFrightenedTime() == 0) {
+                stopClip(eatSuperClip);
+                playLoopClip(sirenClip);
+            } else {
+                stopClip(sirenClip);
+                playLoopClip(eatSuperClip);
+            }
+        }
         handleFrightenedMode(blinky);
-//        handleFrightenedMode(pinky);
-//        handleFrightenedMode(inky);
-//        handleFrightenedMode(clyde);
+        handleFrightenedMode(pinky);
+        handleFrightenedMode(inky);
+        handleFrightenedMode(clyde);
     }
 
     private void handleFrightenedMode(Ghost ghost) {
+
         if (ghost.getFrightenedStage() == 1) {
-            stopClip(sirenClip);
-            playLoopClip(eatSuperClip);
-            ghost.loadFrightenedBlue();
+            ghost.setBlinking(false);
             ghost.setIsFrightened(true);
+            ghost.setSpeed(0.05);
             ghost.setFrightenedStage(2);
         }
 
-        if (gameMode.getFrightenedTime() == 0) {
-            stopClip(eatSuperClip);
-            playLoopClip(sirenClip);
+        if (ghost.getFrightenedStage() == 2 && gameMode.getFrightenedTime() == 2) {
+            ghost.setBlinking(true);
         }
 
         if (ghost.getFrightenedStage() == 2 && gameMode.getFrightenedTime() == 0) {
-            ghost.loadNormalDanceStances();
+            ghost.setBlinking(false);
             ghost.setIsFrightened(false);
+            ghost.snapToCell();
+            ghost.resetSpeed();
             ghost.setFrightenedStage(0);
         }
 
         if (ghost.getFrightenedStage() == 2 && pacmanGhostCollision(ghost)) {
             playClip(eatGhostClip);
-            ghost.loadEatenEyes();
+            ghost.setBlinking(false);
+            ghost.setEaten(true);
             ghost.snapToCell();
             ghost.setSpeed(0.2);
             ghost.setFrightenedStage(3);
@@ -463,8 +567,8 @@ public class Pacman extends Applet implements Runnable, KeyListener {
 
         if (ghost.getFrightenedStage() == 3 && ghost.isInGhostHouse()) {
             ghost.setIsFrightened(false);
+            ghost.setEaten(false);
             ghost.setPrevCell(null);
-            ghost.loadNormalDanceStances();
             ghost.resetSpeed();
             ghost.setFrightenedStage(0);
         }
@@ -472,16 +576,23 @@ public class Pacman extends Applet implements Runnable, KeyListener {
 
 
     private void playClip(Clip clip) {
-        clip.setFramePosition(0);
-        clip.start();
+        if (!muteSound) {
+            clip.stop();
+            clip.setFramePosition(0);
+            clip.start();
+        }
     }
 
     private void playLoopClip(Clip clip) {
-        clip.loop(Clip.LOOP_CONTINUOUSLY);
+        if (!muteSound) {
+            clip.loop(Clip.LOOP_CONTINUOUSLY);
+        }
     }
 
     private void stopClip(Clip clip) {
-        clip.stop();
+        if (!muteSound) {
+            clip.stop();
+        }
     }
 
     private void drawItems(Graphics2D g) {
@@ -578,6 +689,9 @@ public class Pacman extends Applet implements Runnable, KeyListener {
         }
         if (key == VK_RIGHT) {
             keysPressed[KEY_RIGHT] = true;
+        }
+        if (key == VK_R) {
+            keysPressed[KEY_RESTART] = true;
         }
     }
 

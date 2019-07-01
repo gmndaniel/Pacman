@@ -9,10 +9,10 @@ public class Pinky extends Ghost {
         homeCell1 = Pacman.field[1][4];
         homeCell2 = Pacman.field[5][5];
         homeCell = homeCell1;
-        ghostHouse = Pacman.field[14][14];
+        ghostHouse = cell;
         danceStance = 5;
         loadNormalDanceStances();
-        loadSprite();
+        startAnimation(normalDanceAnimation[0]);
     }
 
     @Override

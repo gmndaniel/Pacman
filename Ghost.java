@@ -2,7 +2,7 @@ package PacmanPack;
 
 import java.awt.image.BufferedImage;
 
-import static PacmanPack.Pacman.Type.GHOST_HOUSE;
+import static PacmanPack.Pacman.Type.WALL;
 import static PacmanPack.Pacman.pacmanIsDying;
 import static PacmanPack.Pacman.standStill;
 import static PacmanPack.SpriteMap.getSprite;
@@ -13,30 +13,41 @@ public abstract class Ghost extends Sprite {
     protected Cell homeCell2;
     protected Cell homeCell;
     protected Cell ghostHouse;
-    protected Cell prevCell = null;
     protected int frightenedStage = 0;
     protected boolean isFrightened = false;
     protected int danceStance;
     protected boolean isEaten = false;
     protected Cell randomCell = null;
+    protected boolean isBlinking;
 
     protected abstract Cell chaseStrategy();
+
     protected abstract Cell scatterStrategy();
+
+    public void setEaten(boolean eaten) {
+        isEaten = eaten;
+    }
 
     @Override
     public Cell move(boolean chase) {
         locateSpriteCell();
         checkIfHomeCell();
 
-//        if (spriteCell.getType() == GHOST_HOUSE) {
-//            System.out.println(spriteCell);
-//        }
-
         boolean canMoveBack = false;
         Cell targetCell = randomCell;
         Cell nextCell = null;
 
-        if (standStill || pacmanIsDying) {
+        if (dancingInGhostHouse && isFrightened) {
+            startFrightenedAnimation();
+            targetCell = spriteCell;
+        } else if (dancingInGhostHouse) {
+            if (spriteFacing == Pacman.Facing.UP) {
+                startAnimation(normalDanceAnimation[2]);
+            } else if (spriteFacing == Pacman.Facing.DOWN) {
+                startAnimation(normalDanceAnimation[3]);
+            }
+            targetCell = spriteCell;
+        } else if (standStill || pacmanIsDying) {
             targetCell = spriteCell;
         } else if (isEaten) {
             targetCell = ghostHouse;
@@ -45,7 +56,7 @@ public abstract class Ghost extends Sprite {
             if (spriteCell != prevCell || targetCell == null) {
                 targetCell = moveToRandom();
                 randomCell = targetCell;
-                canMoveBack = true;
+                canMoveBack = false;
             }
         } else if (!chase) {
             targetCell = scatterStrategy();
@@ -57,20 +68,37 @@ public abstract class Ghost extends Sprite {
             Pathfinder.findPath(spriteCell, prevCell, targetCell, spriteLevel, canMoveBack);
             prevCell = spriteCell;
         }
+
         nextCell = findNextCell(targetCell, spriteLevel);
         setDance(nextCell);
         moveToNextCell(nextCell);
         return targetCell;
     }
 
+    protected Cell moveToRandom() {
+        Cell nextCell = spriteCell;
+        do {
+            int rand4 = (int) (Math.random() * ((3) + 1));
+            if (rand4 == 0) nextCell = spriteCell.getLeft();
+            if (rand4 == 1) nextCell = spriteCell.getRight();
+            if (rand4 == 2) nextCell = spriteCell.getUp();
+            if (rand4 == 3) nextCell = spriteCell.getDown();
+        } while (nextCell.getType() == WALL && nextCell != prevCell);
+        return nextCell;
+    }
+
+    protected void startFrightenedAnimation() {
+        setNormalOrEatenAnimation(0);
+    }
 
     public Ghost(Cell cell, int spriteLevel) {
         super(cell, spriteLevel);
+        loadFrightenedBlue();
+        loadFrightenedBlinking();
+        loadEatenEyes();
     }
 
-
     protected Cell findNextCell(Cell targetCell, int l) {
-
         while (targetCell.getParent(l) != null && targetCell.getParent(l).getParent(l) != null) {
             targetCell = targetCell.getParent(l);
         }
@@ -85,55 +113,9 @@ public abstract class Ghost extends Sprite {
         }
     }
 
-    protected Cell moveToRandom() {
-        int rand4 = (int) (Math.random() * ((3) + 1));
-        int rand3 = (int) (Math.random() * ((2) + 1));
-        int rand2 = (int) (Math.random() * ((1) + 1));
-        if (spriteCell.getIntersectionType() == 1) {
-            if (rand4 == 0) return spriteCell.getLeft();
-            if (rand4 == 1) return spriteCell.getRight();
-            if (rand4 == 2) return spriteCell.getUp();
-            if (rand4 == 3) return spriteCell.getDown();
-        } else if (spriteCell.getIntersectionType() == 2) {
-            if (rand3 == 0) return spriteCell.getRight();
-            if (rand3 == 1) return spriteCell.getUp();
-            if (rand3 == 2) return spriteCell.getDown();
-        } else if (spriteCell.getIntersectionType() == 3) {
-            if (rand3 == 0) return spriteCell.getLeft();
-            if (rand3 == 1) return spriteCell.getRight();
-            if (rand3 == 2) return spriteCell.getDown();
-        } else if (spriteCell.getIntersectionType() == 4) {
-            if (rand3 == 0) return spriteCell.getUp();
-            if (rand3 == 1) return spriteCell.getLeft();
-            if (rand3 == 2) return spriteCell.getDown();
-        } else if (spriteCell.getIntersectionType() == 5) {
-            if (rand3 == 0) return spriteCell.getUp();
-            if (rand3 == 1) return spriteCell.getLeft();
-            if (rand3 == 2) return spriteCell.getRight();
-        } else if (spriteCell.getIntersectionType() == -1) {
-            if (rand2 == 0) return spriteCell.getDown();
-            if (rand2 == 1) return spriteCell.getRight();
-        } else if (spriteCell.getIntersectionType() == -2) {
-            if (rand2 == 0) return spriteCell.getDown();
-            if (rand2 == 1) return spriteCell.getLeft();
-        } else if (spriteCell.getIntersectionType() == -3) {
-            if (rand2 == 0) return spriteCell.getUp();
-            if (rand2 == 1) return spriteCell.getLeft();
-        } else if (spriteCell.getIntersectionType() == -4) {
-            if (rand2 == 0) return spriteCell.getUp();
-            if (rand2 == 1) return spriteCell.getRight();
-        }
-
-        if (spriteFacing == Pacman.Facing.UP) {
-            return spriteCell.getUp();
-        } else if (spriteFacing == Pacman.Facing.DOWN) {
-            return spriteCell.getDown();
-        } else if (spriteFacing == Pacman.Facing.LEFT) {
-            return spriteCell.getLeft();
-        } //else if (spriteFacing == Pacman.Facing.RIGHT)
-        return spriteCell.getRight();
+    public void setBlinking(boolean blinking) {
+        isBlinking = blinking;
     }
-
 
     public int getFrightenedStage() {
         return frightenedStage;
@@ -141,7 +123,6 @@ public abstract class Ghost extends Sprite {
 
     public void setFrightenedStage(int frightenedStage) {
         this.frightenedStage = frightenedStage;
-//        System.out.println("stage " + this.frightenedStage);
     }
 
     protected Cell cellsAhead(Cell targetCell, int ahead) {
@@ -186,84 +167,35 @@ public abstract class Ghost extends Sprite {
 
 
     private boolean notHitWall(int ahead, Cell cell) {
-        return (cell.getType() != Pacman.Type.WALL) && (ahead > 0);
+        return (cell.getType() != WALL) && (ahead > 0);
     }
 
-    protected void loadDanceStances(int y) {
-        danceRight = new BufferedImage[]{
-                getSprite(0, y),
-                getSprite(1, y)};
-        danceLeft = new BufferedImage[]{
-                getSprite(2, y),
-                getSprite(3, y)};
-        danceUp = new BufferedImage[]{
-                getSprite(4, y),
-                getSprite(5, y)};
-        danceDown = new BufferedImage[]{
-                getSprite(6, y),
-                getSprite(7, y)};
-        dance = danceLeft;
-    }
-
-    protected void loadFrightenedBlue() {
-
-        BufferedImage blueFrightened1 = getSprite(8, 4);
-        BufferedImage blueFrightened2 = getSprite(9, 4);
-        danceRight = new BufferedImage[]{
-                blueFrightened1,
-                blueFrightened2};
-        danceLeft = new BufferedImage[]{
-                blueFrightened1,
-                blueFrightened2};
-        danceUp = new BufferedImage[]{
-                blueFrightened1,
-                blueFrightened2};
-        danceDown = new BufferedImage[]{
-                blueFrightened1,
-                blueFrightened2};
-    }
-
-    protected void loadEatenEyes() {
-        danceRight = new BufferedImage[]{
-                getSprite(8, 5),
-                getSprite(8, 5)};
-        danceLeft = new BufferedImage[]{
-                getSprite(9, 5),
-                getSprite(9, 5)};
-        danceUp = new BufferedImage[]{
-                getSprite(10, 5),
-                getSprite(10, 5)};
-        danceDown = new BufferedImage[]{
-                getSprite(11, 5),
-                getSprite(11, 5)};
-        isEaten = true;
-    }
 
     protected void setDance(Cell nextCell) {
-        if (spriteCell.getRight() == nextCell) {
-            if (dance != danceRight) {
-                spriteFacing = Pacman.Facing.RIGHT;
-                dance = danceRight;
-                loadSprite();
-            }
+        if (isBlinking) {
+            startAnimation(blinkAnimation[0]);
+        } else if (isFrightened && !isEaten) {
+            startAnimation(blueAnimation[0]);
         } else if (spriteCell.getLeft() == nextCell) {
-            if (dance != danceLeft) {
-                spriteFacing = Pacman.Facing.LEFT;
-                dance = danceLeft;
-                loadSprite();
-            }
+            spriteFacing = Pacman.Facing.LEFT;
+            setNormalOrEatenAnimation(0);
+        } else if (spriteCell.getRight() == nextCell) {
+            spriteFacing = Pacman.Facing.RIGHT;
+            setNormalOrEatenAnimation(1);
         } else if (spriteCell.getUp() == nextCell) {
-            if (dance != danceUp) {
-                spriteFacing = Pacman.Facing.UP;
-                dance = danceUp;
-                loadSprite();
-            }
+            spriteFacing = Pacman.Facing.UP;
+            setNormalOrEatenAnimation(2);
         } else if (spriteCell.getDown() == nextCell) {
-            if (dance != danceDown) {
-                spriteFacing = Pacman.Facing.DOWN;
-                dance = danceDown;
-                loadSprite();
-            }
+            spriteFacing = Pacman.Facing.DOWN;
+            setNormalOrEatenAnimation(3);
+        }
+    }
+
+    private void setNormalOrEatenAnimation(int i) {
+        if (isEaten) {
+            startAnimation(eatenAnimation[i]);
+        } else {
+            startAnimation(normalDanceAnimation[i]);
         }
     }
 
@@ -287,5 +219,75 @@ public abstract class Ghost extends Sprite {
 
     public void setPrevCell(Cell prevCell) {
         this.prevCell = prevCell;
+    }
+
+
+    protected void loadDanceStances(int y) {
+        danceRight = new BufferedImage[]{
+                getSprite(0, y),
+                getSprite(1, y),
+        };
+        danceLeft = new BufferedImage[]{
+                getSprite(2, y),
+                getSprite(3, y),
+        };
+        danceUp = new BufferedImage[]{
+                getSprite(4, y),
+                getSprite(5, y),
+        };
+        danceDown = new BufferedImage[]{
+                getSprite(6, y),
+                getSprite(7, y),
+        };
+        normalDanceAnimation = new Animation[]{
+                new Animation(danceLeft, 2),
+                new Animation(danceRight, 2),
+                new Animation(danceUp, 2),
+                new Animation(danceDown, 2)};
+    }
+
+    protected void loadFrightenedBlue() {
+        danceBlue = new BufferedImage[]{
+                getSprite(8, 4),
+                getSprite(9, 4),
+        };
+        blueAnimation = new Animation[]{
+                new Animation(danceBlue, 2),
+        };
+    }
+
+    protected void loadFrightenedBlinking() {
+        BufferedImage blue1 = getSprite(8, 4);
+        BufferedImage blue2 = getSprite(9, 4);
+        BufferedImage white1 = getSprite(10, 4);
+        BufferedImage white2 = getSprite(11, 4);
+
+        danceBlink = new BufferedImage[]{
+                blue1,
+                white1,
+                blue2,
+                white2,
+        };
+        blinkAnimation = new Animation[]{
+                new Animation(danceBlink, 4),
+        };
+    }
+
+    protected void loadEatenEyes() {
+        eatenRight = new BufferedImage[]{
+                getSprite(8, 5)};
+        eatenLeft = new BufferedImage[]{
+                getSprite(9, 5)};
+        eatenUp = new BufferedImage[]{
+                getSprite(10, 5)};
+        eatenDown = new BufferedImage[]{
+                getSprite(11, 5)};
+
+        eatenAnimation = new Animation[]{
+                new Animation(eatenLeft, 4),
+                new Animation(eatenRight, 4),
+                new Animation(eatenUp, 4),
+                new Animation(eatenDown, 4),
+        };
     }
 }

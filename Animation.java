@@ -76,7 +76,7 @@ public class Animation {
         currentFrame = 0;
     }
 
-    public BufferedImage getSprite() {
+    public BufferedImage getSpriteFrame() {
         return frames.get(currentFrame).getFrame();
     }
 
@@ -91,12 +91,14 @@ public class Animation {
                 if (currentFrame > totalFrames - 1) {
                     currentFrame = 0;
                     if (playOnce){
+                        playOnce = false;
                         currentFrame = totalFrames - 1;
                         stopped = true;
                     }
                 } else if (currentFrame < 0) {
                     currentFrame = totalFrames - 1;
                     if (playOnce){
+                        playOnce = false;
                         currentFrame = totalFrames - 1;
                         stopped = true;
                     }

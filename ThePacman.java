@@ -2,11 +2,13 @@ package PacmanPack;
 
 import java.awt.image.BufferedImage;
 
+import static PacmanPack.Pacman.Facing.*;
 import static PacmanPack.Pacman.pacmanIsDying;
 import static PacmanPack.Pacman.standStill;
 import static PacmanPack.SpriteMap.*;
 
 public class ThePacman extends Sprite {
+
     private BufferedImage[] staticDanceRight;
     private BufferedImage[] staticDanceLeft;
     private BufferedImage[] staticDanceUp;
@@ -14,14 +16,28 @@ public class ThePacman extends Sprite {
 
     public ThePacman(Cell cell, int spriteLevel) {
         super(cell, spriteLevel);
-
+        startingCell = cell;
         loadDanceStances();
         loadDeathAnimation();
-        loadSprite();
 
-        spriteCell = cell;
-        spriteFacing = Pacman.Facing.LEFT;
-        spriteSpeed = 0.2;
+        normalDanceAnimation = new Animation[]{
+                new Animation(danceLeft, 2),
+                new Animation(danceRight, 2),
+                new Animation(danceUp, 2),
+                new Animation(danceDown, 2)};
+        startAnimation(normalDanceAnimation[0]);
+
+        staticDanceAnimation = new Animation[]{
+                new Animation(staticDanceLeft, 2),
+                new Animation(staticDanceRight, 2),
+                new Animation(staticDanceUp, 2),
+                new Animation(staticDanceDown, 2)};
+        startAnimation(staticDanceAnimation[0]);
+
+        spriteCell = startingCell;
+        spriteFacing = LEFT;
+        prevCell = startingCell.getRight();
+        spriteSpeed = 0.125;
     }
 
     private void loadDeathAnimation() {
@@ -51,20 +67,12 @@ public class ThePacman extends Sprite {
         BufferedImage closedPacman = getSprite(2, 0);
 
         staticDanceRight = new BufferedImage[]{
-                staticRight,
-                staticRight,
                 staticRight};
         staticDanceLeft = new BufferedImage[]{
-                staticLeft,
-                staticLeft,
                 staticLeft};
         staticDanceUp = new BufferedImage[]{
-                staticUp,
-                staticUp,
                 staticUp};
         staticDanceDown = new BufferedImage[]{
-                staticDown,
-                staticDown,
                 staticDown};
         danceRight = new BufferedImage[]{
                 getSprite(0, 0),
@@ -84,7 +92,6 @@ public class ThePacman extends Sprite {
                 closedPacman};
 
         dance = staticDanceLeft;
-//        dance = danceLeft;
     }
 
     public Cell move(boolean chase) {
@@ -99,75 +106,73 @@ public class ThePacman extends Sprite {
     }
 
     private Cell calcNextCell() {
-        if (spriteFacing == Pacman.Facing.LEFT) {
-            setDance(spriteCell.getLeft(), danceLeft, staticDanceLeft);
+        if (spriteFacing == LEFT) {
+            setDance(spriteCell.getLeft(), 0);
             return spriteCell.getLeft();
         }
         if (spriteFacing == Pacman.Facing.RIGHT) {
-            setDance(spriteCell.getRight(), danceRight, staticDanceRight);
+            setDance(spriteCell.getRight(), 1);
             return spriteCell.getRight();
         }
         if (spriteFacing == Pacman.Facing.UP) {
-            setDance(spriteCell.getUp(), danceUp, staticDanceUp);
+            setDance(spriteCell.getUp(), 2);
             return spriteCell.getUp();
         }
         if (spriteFacing == Pacman.Facing.DOWN) {
-            setDance(spriteCell.getDown(), danceDown, staticDanceDown);
+            setDance(spriteCell.getDown(), 3);
             return spriteCell.getDown();
         }
         return spriteCell;
     }
 
-    private void setDance(Cell nextCell, BufferedImage[] danceDir, BufferedImage[] staticDanceDir) {
+    private void setDance(Cell nextCell, int direction) {
         if (nextCell.getType() == Pacman.Type.DOT) {
-            if (dance != danceDir) {
-                dance = danceDir;
-                loadSprite();
-            }
+            startAnimation(normalDanceAnimation[direction]);
         } else {
-            if (dance != staticDanceDir) {
-                dance = staticDanceDir;
-                loadSprite();
-            }
+            startAnimation(staticDanceAnimation[direction]);
         }
-    }
-
-
-    public void tryUp(boolean keyPressed) {
-        if (keyPressed) {
-            if (isNextCellOK(spriteCell.getUp())) {
-                spriteFacing = Pacman.Facing.UP;
-            }
-        }
-    }
-
-    public void tryDown(boolean keyPressed) {
-        if (keyPressed) {
-            if (isNextCellOK(spriteCell.getDown())) {
-                spriteFacing = Pacman.Facing.DOWN;
-            }
-        }
-    }
-
-    private boolean isNextCellOK(Cell cell) {
-        return cell.getType() != Pacman.Type.WALL &&
-                cell.getType() != Pacman.Type.GHOST_HOUSE;
     }
 
     public void tryLeft(boolean keyPressed) {
         if (keyPressed) {
-            if (isNextCellOK(spriteCell.getLeft())) {
-                spriteFacing = Pacman.Facing.LEFT;
+            if (isNextCellOK(spriteCell.getLeft()) && prevCell.getLeft() != spriteCell.getLeft()) {
+                spriteFacing = LEFT;
+                prevCell = spriteCell;
             }
         }
     }
 
     public void tryRight(boolean keyPressed) {
         if (keyPressed) {
-            if (isNextCellOK(spriteCell.getRight())) {
-                spriteFacing = Pacman.Facing.RIGHT;
+            if (isNextCellOK(spriteCell.getRight()) && prevCell.getRight() != spriteCell.getRight()) {
+                spriteFacing = RIGHT;
+                prevCell = spriteCell;
             }
         }
+    }
+
+    public void tryUp(boolean keyPressed) {
+        if (keyPressed) {
+            if (isNextCellOK(spriteCell.getUp()) && prevCell.getUp() != spriteCell.getUp()) {
+                spriteFacing = UP;
+                prevCell = spriteCell;
+            }
+        }
+    }
+
+    public void tryDown(boolean keyPressed) {
+        if (keyPressed) {
+            if (isNextCellOK(spriteCell.getDown()) && prevCell.getDown() != spriteCell.getDown()) {
+                spriteFacing = DOWN;
+                prevCell = spriteCell;
+            }
+        }
+    }
+
+    private boolean isNextCellOK(Cell cell) {
+
+        return cell.getType() != Pacman.Type.WALL &&
+                cell.getType() != Pacman.Type.GHOST_HOUSE;
     }
 
     public Pacman.Facing getFacing() {

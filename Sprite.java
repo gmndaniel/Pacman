@@ -11,8 +11,9 @@ public abstract class Sprite implements ImageObserver {
     protected int matrixCol;
     protected double virtualRow;
     protected double virtualCol;
-    private BufferedImage spriteImg;
     protected Cell spriteCell;
+    protected Cell prevCell = null;
+    protected Cell startingCell;
 
     protected double spriteSpeed = 0;
     protected double spriteBaseSpeed = spriteSpeed;
@@ -24,20 +25,39 @@ public abstract class Sprite implements ImageObserver {
     protected BufferedImage[] danceRight;
     protected BufferedImage[] danceUp;
     protected BufferedImage[] danceDown;
+    protected BufferedImage[] danceBlue;
     protected BufferedImage[] spriteDeath;
-    private Animation dancing;
-    private Animation deathAnimation;
+    protected BufferedImage[] danceBlink;
+    protected BufferedImage[] eatenLeft;
+    protected BufferedImage[] eatenRight;
+    protected BufferedImage[] eatenUp;
+    protected BufferedImage[] eatenDown;
+
+    protected Animation[] normalDanceAnimation;
+    protected Animation[] blueAnimation;
+    protected Animation[] blinkAnimation;
+    protected Animation[] eatenAnimation;
+    protected Animation[] staticDanceAnimation;
+    protected Animation pacmanDeathAnimation;
+
     private Animation animation;
-    protected boolean isInGhostHouse = true;
+    protected boolean dancingInGhostHouse = false;
+    private double ghostHouseDanceOffset = 0;
+    private int ghostHouseDanceDir = 0;
 
     public abstract Cell move(boolean chase);
 
-    public Sprite(Cell cell, int spriteLevel) {
+    protected Sprite(Cell cell, int spriteLevel) {
+        spriteCell = cell;
         matrixRow = cell.getRow();
         matrixCol = cell.getCol();
         virtualRow = matrixRow;
         virtualCol = matrixCol;
         this.spriteLevel = spriteLevel;
+    }
+
+    public void setDancingInGhostHouse(boolean dancingInGhostHouse) {
+        this.dancingInGhostHouse = dancingInGhostHouse;
     }
 
     public double getVirtualRow() {
@@ -49,22 +69,64 @@ public abstract class Sprite implements ImageObserver {
     }
 
     protected void startDeathAnimation() {
-        deathAnimation = new Animation(spriteDeath, 5);
-        animation = deathAnimation;
+        pacmanDeathAnimation = new Animation(spriteDeath, 5);
+        animation = pacmanDeathAnimation;
         animation.playOnce();
     }
 
-    protected void loadSprite() {
-        dancing = new Animation(dance, 2);
-        animation = dancing;
+    protected void startAnimation(Animation animation) {
+        this.animation = animation;
         animation.start();
     }
 
     public void draw(Graphics g) {
         animation.update();
-        int screenX = (int) (8 + (virtualCol - VIRT_BORDERS / 2) * W_COEFF - 32 / 2);
-        int screenY = (int) (8 + virtualRow * H_COEFF - 32 / 2);
-        g.drawImage(animation.getSprite(), screenX, screenY, this);
+        int screenY = (int) (8 + overrideRow() * H_COEFF - 32 / 2);
+        int screenX = (int) (8 + (overrideCol() - VIRT_BORDERS / 2) * W_COEFF - 32 / 2);
+        g.drawImage(animation.getSpriteFrame(), screenX, screenY, this);
+    }
+
+    protected double overrideRow() {
+        double overridenRow = virtualRow;
+        double danceRad = 0.65;
+        double offsetStep = 0.05;
+        if (dancingInGhostHouse && !standStill) {
+            if (ghostHouseDanceOffset < -danceRad) {
+                spriteFacing = Facing.DOWN;
+                ghostHouseDanceDir = 0;
+            } else if (ghostHouseDanceOffset > danceRad) {
+                spriteFacing = Facing.UP;
+                ghostHouseDanceDir = 1;
+            }
+
+            if (ghostHouseDanceDir == 0) {
+                ghostHouseDanceOffset += offsetStep;
+            } else {
+                ghostHouseDanceOffset -= offsetStep;
+            }
+            overridenRow += ghostHouseDanceOffset;
+        }
+        return overridenRow;
+    }
+
+    protected double overrideCol() {
+        double overridenCol = virtualCol;
+
+        if (matrixRow == 14) {
+            if (virtualCol == 13) {
+                overridenCol = 12.8;
+            } else if (virtualCol == 15) {
+                overridenCol = 14.6;
+            } else if (virtualCol == 16) {
+                overridenCol = 16.5;
+            }
+        } else if (12 <= matrixRow && matrixRow <= 13) {
+            if (14 <= virtualCol && virtualCol <= 15) {
+                overridenCol = 14.5;
+            }
+        }
+        return overridenCol;
+
     }
 
     @Override
@@ -77,11 +139,7 @@ public abstract class Sprite implements ImageObserver {
     }
 
     protected void locateSpriteCell() {
-        if (isInGhostHouse) {
-            spriteCell = Pacman.ghostHouseMid;
-        } else {
-            spriteCell = Pacman.field[matrixRow][matrixCol];
-        }
+        spriteCell = Pacman.field[matrixRow][matrixCol];
     }
 
     protected void moveToNextCell(Cell nextCell) {

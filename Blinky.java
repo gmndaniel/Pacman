@@ -4,15 +4,17 @@ public class Blinky extends Ghost {
 
     public Blinky(Cell cell, int spriteLevel) {
         super(cell, spriteLevel);
+        startingCell = cell;
         spriteBaseSpeed = 0.1;
         spriteSpeed = spriteBaseSpeed;
         homeCell1 = Pacman.field[1][24];
         homeCell2 = Pacman.field[5][24];
         homeCell = homeCell1;
-        ghostHouse = Pacman.ghostHouseLeft;
+        ghostHouse = Pacman.field[14][13];
         danceStance = 4;
+        dancingInGhostHouse = false;
         loadNormalDanceStances();
-        loadSprite();
+        startAnimation(normalDanceAnimation[0]);
     }
 
     @Override

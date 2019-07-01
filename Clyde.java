@@ -9,10 +9,10 @@ public class Clyde extends Ghost {
         homeCell1 = Pacman.field[29][8];
         homeCell2 = Pacman.field[25][7];
         homeCell = homeCell1;
-        ghostHouse = Pacman.field[14][16];
+        ghostHouse = cell;
         danceStance = 7;
         loadNormalDanceStances();
-        loadSprite();
+        startAnimation(normalDanceAnimation[0]);
     }
 
     @Override
